@@ -27,7 +27,9 @@ dependencies = [
     "twelvedata",
     "requests",
     "flask",
-    "flask-socketio"
+    "flask-socketio",
+    "setuptools>=65.0.0",
+    "wheel"
 ]
 
 [tool.setuptools]

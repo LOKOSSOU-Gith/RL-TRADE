@@ -489,7 +489,15 @@ class OptimizedTradingBot:
                 return 'CLOSE', 0.0
             
             # Préparer l'observation
-            features = current_data.drop('<DT>', axis=1).values.reshape(1, -1)
+            features = current_data.drop('<DT>', axis=1).values
+            
+            # Vérifier la forme attendue (5 features)
+            if len(features) != 5:
+                # Ajouter des features manquantes si nécessaire
+                while len(features) < 5:
+                    features = np.append(features, 0.0)  # Ajouter 0.0 pour les features manquantes
+                
+            features = features.reshape(1, -1)
             
             # Prédire l'action
             action, _states = self.model.predict(features, deterministic=True)
@@ -706,7 +714,7 @@ def stop_bot():
 
 # WebSocket events
 @socketio.on('connect')
-def handle_connect():
+def handle_connect(auth=None):
     print("🔌 Client connecté")
     # Convertir les deque en listes pour la sérialisation JSON
     safe_state = {
