@@ -365,17 +365,36 @@ class OptimizedTradingBot:
             try:
                 if not self.check_api_limit():
                     print("⏳ Limite API atteinte - Attente du prochain jour...")
+                    socketio.emit('api_limit_reached', {
+                        'message': 'Limite API atteinte - Attente...',
+                        'api_usage': f"{bot_state['api_requests_today']}/{bot_state['api_limit']}"
+                    })
                     time.sleep(3600)  # Attendre 1 heure
                     continue
                 
                 bot_state['cycle_count'] += 1
                 print(f"\n🔄 Cycle #{bot_state['cycle_count']} - Requêtes API: {bot_state['api_requests_today']}/{bot_state['api_limit']}")
                 
+                # Envoyer le début du cycle
+                socketio.emit('cycle_start', {
+                    'cycle': bot_state['cycle_count'],
+                    'phase': 'TRAINING',
+                    'api_usage': f"{bot_state['api_requests_today']}/{bot_state['api_limit']}"
+                })
+                
                 # Phase 1: Entraînement (5 minutes)
                 if self.training_phase(duration_minutes=5):
                     print("✅ Entraînement du cycle terminé")
+                    socketio.emit('training_complete', {
+                        'cycle': bot_state['cycle_count'],
+                        'message': 'Entraînement terminé'
+                    })
                 else:
                     print("❌ Échec de l'entraînement")
+                    socketio.emit('training_error', {
+                        'cycle': bot_state['cycle_count'],
+                        'message': 'Échec de l\'entraînement'
+                    })
                     time.sleep(60)
                     continue
                 
@@ -385,18 +404,35 @@ class OptimizedTradingBot:
                 # Phase 2: Trading (3 minutes)
                 if self.trading_phase(duration_minutes=3):
                     print("✅ Trading du cycle terminé")
+                    socketio.emit('trading_complete', {
+                        'cycle': bot_state['cycle_count'],
+                        'message': 'Trading terminé'
+                    })
                 else:
                     print("❌ Échec du trading")
+                    socketio.emit('trading_error', {
+                        'cycle': bot_state['cycle_count'],
+                        'message': 'Échec du trading'
+                    })
                     time.sleep(60)
                     continue
                 
                 # Pause entre les cycles
                 print("⏳ Pause de 2 minutes avant le prochain cycle...")
                 bot_state['current_phase'] = 'RESTING'
+                socketio.emit('cycle_rest', {
+                    'cycle': bot_state['cycle_count'],
+                    'message': 'Pause avant prochain cycle',
+                    'duration': '2 minutes'
+                })
                 time.sleep(120)  # 2 minutes de pause
                 
             except Exception as e:
                 print(f"❌ Erreur dans le cycle: {e}")
+                socketio.emit('cycle_error', {
+                    'cycle': bot_state['cycle_count'],
+                    'error': str(e)
+                })
                 time.sleep(300)  # 5 minutes de pause en cas d'erreur
 
 # Instance globale du bot
@@ -409,24 +445,14 @@ def index():
 
 @app.route('/api/status')
 def get_status():
-    return jsonify({
-        'current_position': bot_state['current_position'],
-        'portfolio_value': bot_state['portfolio_value'],
-        'total_trades': bot_state['total_trades'],
-        'winning_trades': bot_state['winning_trades'],
-        'losing_trades': bot_state['losing_trades'],
-        'last_price': bot_state['last_price'],
-        'last_prediction': bot_state['last_prediction'],
-        'last_reward': bot_state['last_reward'],
-        'total_reward': bot_state['total_reward'],
-        'is_running': bot_state['is_running'],
-        'current_phase': bot_state['current_phase'],
-        'cycle_count': bot_state['cycle_count'],
-        'api_requests_today': bot_state['api_requests_today'],
-        'api_limit': bot_state['api_limit'],
-        'training_progress': bot_state['training_progress'],
-        'cycle_performance': bot_state['cycle_performance'][-5:]  # 5 derniers cycles
-    })
+    # Convertir les deque en listes pour la sérialisation JSON
+    safe_state = {
+        **bot_state,
+        'trade_history': list(bot_state['trade_history']),
+        'price_history': list(bot_state['price_history']),
+        'cycle_performance': bot_state['cycle_performance']
+    }
+    return jsonify(safe_state)
 
 @app.route('/api/trade_history')
 def get_trade_history():

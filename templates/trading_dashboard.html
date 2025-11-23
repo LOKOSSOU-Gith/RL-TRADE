@@ -447,6 +447,7 @@
             socket.on('connect', function() {
                 console.log('Connecté au serveur');
                 showAlert('Connecté au serveur du bot optimisé', 'success');
+                updateStatus(); // Mettre à jour immédiatement
             });
 
             socket.on('trade_update', function(data) {
@@ -481,6 +482,47 @@
                 }
             });
 
+            // Nouveaux événements pour les cycles
+            socket.on('cycle_start', function(data) {
+                showAlert(`🔄 Début du Cycle #${data.cycle} - Phase: ${data.phase}`, 'info');
+                updateStatus();
+            });
+
+            socket.on('training_complete', function(data) {
+                showAlert(`✅ Entraînement du Cycle #${data.cycle} terminé!`, 'success');
+                updateStatus();
+            });
+
+            socket.on('training_error', function(data) {
+                showAlert(`❌ Erreur d'entraînement Cycle #${data.cycle}: ${data.message}`, 'error');
+                updateStatus();
+            });
+
+            socket.on('trading_complete', function(data) {
+                showAlert(`💼 Trading du Cycle #${data.cycle} terminé!`, 'success');
+                updateStatus();
+            });
+
+            socket.on('trading_error', function(data) {
+                showAlert(`❌ Erreur de trading Cycle #${data.cycle}: ${data.message}`, 'error');
+                updateStatus();
+            });
+
+            socket.on('cycle_rest', function(data) {
+                showAlert(`⏳ Pause avant prochain cycle (${data.duration})`, 'info');
+                updateStatus();
+            });
+
+            socket.on('cycle_error', function(data) {
+                showAlert(`❌ Erreur Cycle #${data.cycle}: ${data.error}`, 'error');
+                updateStatus();
+            });
+
+            socket.on('api_limit_reached', function(data) {
+                showAlert(`🚨 ${data.message} - ${data.api_usage}`, 'warning');
+                updateStatus();
+            });
+
             socket.on('status_update', function(data) {
                 updateAllDisplays(data);
             });
@@ -502,15 +544,17 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    botState.isRunning = true;
-                    updateButtons();
-                    showAlert('Bot démarré avec succès!', 'success');
-                    document.getElementById('statusIndicator').classList.add('active');
+                    showAlert(result.message, 'success');
+                    // Mettre à jour l'état immédiatement
+                    setTimeout(() => {
+                        updateStatus();
+                    }, 1000);
                 } else {
-                    showAlert('Erreur: ' + result.message, 'danger');
+                    showAlert(result.message, 'error');
                 }
             } catch (error) {
-                showAlert('Erreur de connexion au serveur', 'danger');
+                showAlert('Erreur lors du démarrage du bot', 'error');
+                console.error('Erreur:', error);
             }
         }
 
@@ -526,15 +570,17 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    botState.isRunning = false;
-                    updateButtons();
-                    showAlert('Bot arrêté', 'success');
-                    document.getElementById('statusIndicator').classList.remove('active');
+                    showAlert(result.message, 'warning');
+                    // Mettre à jour l'état immédiatement
+                    setTimeout(() => {
+                        updateStatus();
+                    }, 1000);
                 } else {
-                    showAlert('Erreur: ' + result.message, 'danger');
+                    showAlert(result.message, 'error');
                 }
             } catch (error) {
-                showAlert('Erreur de connexion au serveur', 'danger');
+                showAlert('Erreur lors de l\'arrêt du bot', 'error');
+                console.error('Erreur:', error);
             }
         }
 
