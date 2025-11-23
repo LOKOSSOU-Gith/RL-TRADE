@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=65.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rl-trading"
+version = "1.0.0"
+description = "RL Trading Bot with Flask Interface"
+requires-python = ">=3.13"
+
+dependencies = [
+    "ta==0.10.2",
+    "gymnasium>=0.29.0",
+    "tqdm",
+    "numpy>=2.0.0",
+    "pandas>=2.0.0",
+    "matplotlib",
+    "stable-baselines3[extra]>=2.0.0",
+    "sb3-contrib>=2.0.0",
+    "lightgbm",
+    "scikit-learn",
+    "statsmodels",
+    "joblib",
+    "optuna",
+    "tensorboard",
+    "quantstats",
+    "twelvedata",
+    "requests",
+    "flask",
+    "flask-socketio"
+]
+
+[tool.setuptools]
+packages = ["rl_trading"]

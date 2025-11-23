@@ -1,11 +1,11 @@
 ta==0.10.2
-gymnasium
+gymnasium>=0.29.0
 tqdm
-numpy
-pandas
+numpy>=2.0.0
+pandas>=2.0.0
 matplotlib
-stable-baselines3==1.8.0
-sb3-contrib==1.8.0
+stable-baselines3[extra]>=2.0.0
+sb3-contrib>=2.0.0
 lightgbm
 scikit-learn
 statsmodels
@@ -17,3 +17,5 @@ twelvedata
 requests
 flask
 flask-socketio
+setuptools>=65.0.0
+wheel

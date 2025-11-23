@@ -4,7 +4,7 @@ services:
     name: rl-trading-bot
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -e .
     startCommand: python trading_bot_flask.py
     healthCheckPath: /
     healthCheckTimeout: 1000
