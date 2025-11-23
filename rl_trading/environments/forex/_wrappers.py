@@ -1,7 +1,7 @@
-import gym
+import gymnasium as gym
 import numpy as np
 import pandas as pd
-from gym.utils.seeding import np_random
+from gymnasium.utils.seeding import np_random
 from typing import List, Tuple, Dict, Any, Type
 from ._envs import ForexEnv
 

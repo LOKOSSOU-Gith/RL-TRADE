@@ -1,5 +1,5 @@
 ta==0.10.2
-gym
+gymnasium
 tqdm
 numpy
 pandas
@@ -15,3 +15,5 @@ tensorboard
 quantstats
 twelvedata
 requests
+flask
+flask-socketio

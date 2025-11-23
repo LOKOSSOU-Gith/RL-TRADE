@@ -10,6 +10,9 @@ import numpy as np
 from datetime import datetime, timedelta
 from collections import deque
 import json
+import sqlite3
+import os
+import pickle
 
 from flask import Flask, render_template, jsonify
 from flask_socketio import SocketIO, emit
@@ -25,28 +28,223 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'trading_bot_secret_key'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# Configuration SQLite
+# Utiliser /app/data sur Render pour la persistance, sinon local
+if os.path.exists('/app/data'):
+    DATABASE_PATH = '/app/data/trading_bot.db'
+    os.makedirs('/app/data', exist_ok=True)
+else:
+    DATABASE_PATH = 'trading_bot.db'
+
+def init_db():
+    """Initialiser la base de données SQLite"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    
+    # Table pour les trades
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            action TEXT NOT NULL,
+            price REAL NOT NULL,
+            reward REAL NOT NULL,
+            portfolio_value REAL NOT NULL
+        )
+    ''')
+    
+    # Table pour les prix
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS price_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            price REAL NOT NULL
+        )
+    ''')
+    
+    # Table pour les cycles
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cycles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cycle_number INTEGER NOT NULL,
+            phase TEXT NOT NULL,
+            trades_made INTEGER DEFAULT 0,
+            reward REAL DEFAULT 0.0,
+            duration TEXT,
+            created_at TEXT NOT NULL
+        )
+    ''')
+    
+    # Table pour l'état du bot
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS bot_state (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+def save_trade(trade_data):
+    """Sauvegarder un trade dans la base de données"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO trades (timestamp, action, price, reward, portfolio_value)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (
+        trade_data['timestamp'],
+        trade_data['action'],
+        trade_data['price'],
+        trade_data['reward'],
+        trade_data['portfolio_value']
+    ))
+    conn.commit()
+    conn.close()
+
+def save_price(price_data):
+    """Sauvegarder un prix dans la base de données"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO price_history (timestamp, price)
+        VALUES (?, ?)
+    ''', (price_data['timestamp'], price_data['price']))
+    conn.commit()
+    conn.close()
+
+def save_cycle(cycle_data):
+    """Sauvegarder la performance d'un cycle"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO cycles (cycle_number, phase, trades_made, reward, duration, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (
+        cycle_data['cycle'],
+        cycle_data['phase'],
+        cycle_data['trades_made'],
+        cycle_data['reward'],
+        cycle_data['duration'],
+        datetime.now().isoformat()
+    ))
+    conn.commit()
+    conn.close()
+
+def save_bot_state(key, value):
+    """Sauvegarder l'état du bot"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    if isinstance(value, (dict, list)):
+        value = json.dumps(value)
+    cursor.execute('INSERT OR REPLACE INTO bot_state (key, value) VALUES (?, ?)', (key, value))
+    conn.commit()
+    conn.close()
+
+def load_bot_state(key, default=None):
+    """Charger l'état du bot"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT value FROM bot_state WHERE key = ?', (key,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    if result:
+        try:
+            return json.loads(result[0])
+        except:
+            return result[0]
+    return default
+
+def get_recent_trades(limit=50):
+    """Récupérer les trades récents"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT timestamp, action, price, reward, portfolio_value
+        FROM trades
+        ORDER BY id DESC
+        LIMIT ?
+    ''', (limit,))
+    trades = []
+    for row in cursor.fetchall():
+        trades.append({
+            'timestamp': row[0],
+            'action': row[1],
+            'price': row[2],
+            'reward': row[3],
+            'portfolio_value': row[4]
+        })
+    conn.close()
+    return trades
+
+def get_recent_prices(limit=100):
+    """Récupérer les prix récents"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT timestamp, price
+        FROM price_history
+        ORDER BY id DESC
+        LIMIT ?
+    ''', (limit,))
+    prices = []
+    for row in cursor.fetchall():
+        prices.append({
+            'timestamp': row[0],
+            'price': row[1]
+        })
+    conn.close()
+    return prices
+
+def get_cycle_performance():
+    """Récupérer la performance des cycles"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT cycle_number, phase, trades_made, reward, duration
+        FROM cycles
+        ORDER BY id DESC
+        LIMIT 20
+    ''')
+    cycles = []
+    for row in cursor.fetchall():
+        cycles.append({
+            'cycle': row[0],
+            'phase': row[1],
+            'trades_made': row[2],
+            'reward': row[3],
+            'duration': row[4]
+        })
+    conn.close()
+    return cycles
+
+# Initialiser la base de données
+init_db()
+
 # Variables globales pour le bot
 bot_state = {
     'model': None,
     'environment': None,
     'current_position': 'CLOSE',
-    'portfolio_value': 1000.0,
-    'total_trades': 0,
-    'winning_trades': 0,
-    'losing_trades': 0,
-    'last_price': 0.0,
-    'trade_history': deque(maxlen=50),
-    'price_history': deque(maxlen=100),
+    'portfolio_value': load_bot_state('portfolio_value', 1000.0),
+    'total_trades': load_bot_state('total_trades', 0),
+    'winning_trades': load_bot_state('winning_trades', 0),
+    'losing_trades': load_bot_state('losing_trades', 0),
+    'last_price': load_bot_state('last_price', 0.0),
+    'trade_history': deque(get_recent_trades(50), maxlen=50),
+    'price_history': deque(get_recent_prices(100), maxlen=100),
     'is_running': False,
     'current_phase': 'IDLE',  # IDLE, TRAINING, TRADING
-    'cycle_count': 0,
+    'cycle_count': load_bot_state('cycle_count', 0),
     'api_requests_today': 0,
     'api_limit': 800,
     'last_prediction': 'CLOSE',
     'last_reward': 0.0,
-    'total_reward': 0.0,
+    'total_reward': load_bot_state('total_reward', 0.0),
     'training_progress': 0,
-    'cycle_performance': [],
+    'cycle_performance': get_cycle_performance(),
     'session_start': datetime.now()
 }
 
@@ -273,6 +471,10 @@ class OptimizedTradingBot:
             }
             bot_state['cycle_performance'].append(cycle_performance)
             
+            # Sauvegarder dans SQLite
+            save_cycle(cycle_performance)
+            save_bot_state('cycle_count', bot_state['cycle_count'])
+            
             print(f"✅ Phase de trading terminée: {trades_made} trades, Récompense: {phase_reward:.4f}")
             return True
             
@@ -348,10 +550,26 @@ class OptimizedTradingBot:
                 'portfolio_value': bot_state['portfolio_value']
             }
             bot_state['trade_history'].append(trade_record)
+            
+            # Sauvegarder dans SQLite
+            save_trade(trade_record)
+            save_bot_state('total_trades', bot_state['total_trades'])
+            save_bot_state('winning_trades', bot_state['winning_trades'])
+            save_bot_state('losing_trades', bot_state['losing_trades'])
+            save_bot_state('total_reward', bot_state['total_reward'])
+            save_bot_state('portfolio_value', bot_state['portfolio_value'])
+            
             bot_state['price_history'].append({
                 'timestamp': datetime.now().isoformat(),
                 'price': current_price
             })
+            
+            # Sauvegarder le prix
+            save_price({
+                'timestamp': datetime.now().isoformat(),
+                'price': current_price
+            })
+            save_bot_state('last_price', current_price)
             
             return True
             

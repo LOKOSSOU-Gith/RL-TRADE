@@ -1,0 +1,29 @@
+services:
+  # Python Flask Web Service
+  - type: web
+    name: rl-trading-bot
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python trading_bot_flask.py
+    healthCheckPath: /
+    healthCheckTimeout: 1000
+    autoDeploy: true
+    
+    # Environment variables (set these in Render dashboard)
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.4
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      
+    # Directories to include
+    rootDir: ./
+    
+    # Add disk storage for SQLite database persistence
+    disk:
+      name: sqlite-data
+      mountPath: /app/data
+      sizeGB: 1
