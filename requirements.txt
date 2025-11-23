@@ -1,0 +1,17 @@
+ta==0.10.2
+gym
+tqdm
+numpy
+pandas
+matplotlib
+stable-baselines3==1.8.0
+sb3-contrib==1.8.0
+lightgbm
+scikit-learn
+statsmodels
+joblib
+optuna
+tensorboard
+quantstats
+twelvedata
+requests

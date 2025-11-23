@@ -1,0 +1,81 @@
+__pycache__
+*.py[cod]
+*$py.class
+__pycache__/
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Data files
+/data/
+*.csv
+*.pkl
+*.parquet
+
+# Cache
+.cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment variables
+.env
+.env.local
+
+# Temporary files
+tmp/
+.tmp/
+*.tmp
+
+# Flask
+instance/
+.webassets-cache
+
+# Trading specific
+models/
+*.h5
+*.pkl
+*.joblib
+
+# API keys and secrets
+config_local.py
+secrets.json
+.twelvedata_key
